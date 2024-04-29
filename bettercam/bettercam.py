@@ -35,13 +35,17 @@ class BetterCam:
             output=self._output, device=self._device
         )
         self.nvidia_gpu = nvidia_gpu
-        # if nvidia_gpu:
-        #     import cupy as np
-        self._processor: Processor = Processor(output_color=output_color, nvidia_gpu=nvidia_gpu)
+        # Set the rotation angle from the output device
+        self.rotation_angle: int = self._output.rotation_angle
+        # Initialize Processor with the rotation angle
+        self._processor: Processor = Processor(
+            output_color=output_color, 
+            nvidia_gpu=nvidia_gpu, 
+            rotation_angle=self.rotation_angle
+        )
 
         self.width, self.height = self._output.resolution
         self.channel_size = len(output_color) if output_color != "GRAY" else 1
-        self.rotation_angle: int = self._output.rotation_angle
 
         self._region_set_by_user = region is not None
         self.region: Tuple[int, int, int, int] = region
@@ -66,7 +70,7 @@ class BetterCam:
 
         self.__frame_count = 0
         self.__capture_start_time = 0
-
+        
     def grab(self, region: Tuple[int, int, int, int] = None):
         if region is None:
             region = self.region
@@ -84,9 +88,7 @@ class BetterCam:
             )
             self._duplicator.release_frame()
             rect = self._stagesurf.map()
-            frame = self._processor.process(
-                rect, self.width, self.height, region, self.rotation_angle
-            )
+            frame = self._processor.process(rect, self.width, self.height, region)
             self._stagesurf.unmap()
             return frame
         else:
