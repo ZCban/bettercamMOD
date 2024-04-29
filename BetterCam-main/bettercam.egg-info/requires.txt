@@ -1,0 +1,5 @@
+numpy
+comtypes
+
+[cv2]
+opencv-python
