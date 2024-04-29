@@ -39,77 +39,23 @@ class NumpyProcessor(Processor):
 
     def process_A0(self, rect, width, height, region):
         pitch = int(rect.Pitch)
+
+        # Calcolo dell'offset basato sulla regione specificata
         offset = region[1] * pitch
-        new_height = region[3] - region[1]
-        new_width = region[2] - region[0]
-        size = pitch * new_height
+        height = region[3] - region[1]
 
+        # Creazione del buffer numpy direttamente dall'immagine originale
+        size = pitch * height
         buffer = (ctypes.c_char * size).from_address(ctypes.addressof(rect.pBits.contents) + offset)
-        image = np.ndarray((new_height, new_width, 4), dtype=np.uint8, buffer=buffer)
+        image = np.ndarray((height, pitch // 4, 4), dtype=np.uint8, buffer=buffer)
 
-        # Crop if necessary
-        image = image[max(0, region[1]):min(new_height, region[3]), max(0, region[0]):min(new_width, region[2])]
+        # Ridimensionamento finale basato sui limiti della regione
+        if region[3] - region[1] != image.shape[0]:
+            image = image[region[1]: region[3], :, :]
+        if region[2] - region[0] != image.shape[1]:
+            image = image[:, region[0]: region[2], :]
 
-        # Convert color if necessary
-        if self.color_mode is not None:
-            image = self.process_cvtcolor(image)
-
-        return image
-
-    def process_A90(self, rect, width, height, region):
-        pitch = int(rect.Pitch)
-        offset = region[0] * pitch
-        new_height = region[2] - region[0]
-        new_width = region[3] - region[1]
-        size = pitch * new_width
-
-        buffer = (ctypes.c_char * size).from_address(ctypes.addressof(rect.pBits.contents) + offset)
-        image = np.ndarray((new_width, new_height, 4), dtype=np.uint8, buffer=buffer)
-        image = np.rot90(image, k=1)  # Rotate counterclockwise
-
-        # Crop if necessary
-        image = image[max(0, region[1]):min(new_width, region[3]), max(0, region[0]):min(new_height, region[2])]
-
-        # Convert color if necessary
-        if self.color_mode is not None:
-            image = self.process_cvtcolor(image)
-
-        return image
-
-    def process_A180(self, rect, width, height, region):
-        pitch = int(rect.Pitch)
-        offset = (height - region[3]) * pitch
-        new_height = region[3] - region[1]
-        new_width = region[2] - region[0]
-        size = pitch * new_height
-
-        buffer = (ctypes.c_char * size).from_address(ctypes.addressof(rect.pBits.contents) + offset)
-        image = np.ndarray((new_height, new_width, 4), dtype=np.uint8, buffer=buffer)
-        image = np.rot90(image, k=2)  # Rotate 180 degrees
-
-        # Crop if necessary
-        image = image[max(0, region[1]):min(new_height, region[3]), max(0, region[0]):min(new_width, region[2])]
-
-        # Convert color if necessary
-        if self.color_mode is not None:
-            image = self.process_cvtcolor(image)
-        return image
-
-    def process_A270(self, rect, width, height, region):
-        pitch = int(rect.Pitch)
-        offset = (width - region[3]) * pitch
-        new_height = region[2] - region[0]
-        new_width = region[3] - region[1]
-        size = pitch * new_width
-
-        buffer = (ctypes.c_char * size).from_address(ctypes.addressof(rect.pBits.contents) + offset)
-        image = np.ndarray((new_width, new_height, 4), dtype=np.uint8, buffer=buffer)
-        image = np.rot90(image, k=-1)  # Rotate clockwise
-
-        # Crop if necessary
-        image = image[max(0, region[1]):min(new_width, region[3]), max(0, region[0]):min(new_height, region[2])]
-
-        # Convert color if necessary
+        # Applicazione della trasformazione del colore se necessario
         if self.color_mode is not None:
             image = self.process_cvtcolor(image)
 
