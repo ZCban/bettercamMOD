@@ -15,10 +15,10 @@ class Processor:
     def set_rotation_function(self, angle):
         # Map the angle to the processing function
         angle_to_function = {
-            0: self.backend.process_A0,
-            90: self.backend.process_A90,
-            180: self.backend.process_A180,
-            270: self.backend.process_A270
+            0: self.backend.processA0,
+            90: self.backend.processA90,
+            180: self.backend.processA180,
+            270: self.backend.processA270
         }
         self.process = angle_to_function.get(angle)
         if not self.process:
