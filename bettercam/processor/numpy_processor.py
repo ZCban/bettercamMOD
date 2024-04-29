@@ -37,29 +37,74 @@ class NumpyProcessor(Processor):
     def shot(self, image_ptr, rect, width, height):
         ctypes.memmove(image_ptr, rect.pBits, height*width*4)
 
-    def process_A0(self, rect, width, height, region):
-        pitch = int(rect.Pitch)
 
-        # Calcolo dell'offset basato sulla regione specificata
+    def processA0(self, rect, width, height, region):
+        pitch = int(rect.Pitch)
         offset = region[1] * pitch
         height = region[3] - region[1]
-
-        # Creazione del buffer numpy direttamente dall'immagine originale
         size = pitch * height
         buffer = (ctypes.c_char * size).from_address(ctypes.addressof(rect.pBits.contents) + offset)
         image = np.ndarray((height, pitch // 4, 4), dtype=np.uint8, buffer=buffer)
-
-        # Ridimensionamento finale basato sui limiti della regione
+        #image = image[:, :width, :]        
         if region[3] - region[1] != image.shape[0]:
-            image = image[region[1]: region[3], :, :]
+            image = image[region[1]:region[3], :, :]
         if region[2] - region[0] != image.shape[1]:
-            image = image[:, region[0]: region[2], :]
-
-        # Applicazione della trasformazione del colore se necessario
+            image = image[:, region[0]:region[2], :]
+            
         if self.color_mode is not None:
             image = self.process_cvtcolor(image)
-
         return image
+    
+    def processA90(self, rect, width, height, region):
+        pitch = int(rect.Pitch)
+        offset = (width - region[2]) * pitch
+        width = region[2] - region[0]
+        size = pitch * width
+        buffer = (ctypes.c_char * size).from_address(ctypes.addressof(rect.pBits.contents) + offset)
+        image = np.ndarray((width, pitch // 4, 4), dtype=np.uint8, buffer=buffer)
+        image = np.rot90(image, axes=(1, 0))
+        if width != image.shape[0]:
+            image = image[:width, :, :]
+        if height != image.shape[1]:
+            image = image[:, :height, :]
+        if self.color_mode is not None:
+            image = self.process_cvtcolor(image)
+        return image
+    
+    def processA180(self, rect, width, height, region):
+        pitch = int(rect.Pitch)
+        offset = (height - region[3]) * pitch
+        height = region[3] - region[1]
+        size = pitch * height
+        buffer = (ctypes.c_char * size).from_address(ctypes.addressof(rect.pBits.contents) + offset)
+        image = np.ndarray((height, pitch // 4, 4), dtype=np.uint8, buffer=buffer)
+        image = np.rot90(image, k=2, axes=(0, 1))
+        if region[3] - region[1] != image.shape[0]:
+            image = image[region[1]:region[3], :, :]
+        if region[2] - region[0] != image.shape[1]:
+            image = image[:, region[0]:region[2], :]
+        if self.color_mode is not None:
+            image = self.process_cvtcolor(image)
+        return image
+    
+    def process270(self, rect, width, height, region):
+        pitch = int(rect.Pitch)
+        offset = region[0] * pitch
+        width = region[2] - region[0]
+        size = pitch * width
+        buffer = (ctypes.c_char * size).from_address(ctypes.addressof(rect.pBits.contents) + offset)
+        image = np.ndarray((width, pitch // 4, 4), dtype=np.uint8, buffer=buffer)
+        image = np.rot90(image, axes=(0, 1))
+        if width != image.shape[0]:
+            image = image[:width, :, :]
+        if height != image.shape[1]:
+            image = image[:, :height, :]
+        if self.color_mode is not None:
+            image = self.process_cvtcolor(image)
+        return image
+
+
+
 
 
 
