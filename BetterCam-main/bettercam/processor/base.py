@@ -54,7 +54,5 @@ class Processor:
         else:
             raise ValueError(f"Unknown backend: {backend}")
 
-# Example Usage
-processor = Processor(output_color="RGB", nvidia_gpu=True, rotation_angle=90)
 
 
