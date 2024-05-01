@@ -31,9 +31,9 @@ class Processor:
         # Map the angle to the processing function in self.backend (assuming this method is for a GPU context)
         angle_to_function = {
             0: self.backend.processCPA0,
-            90: self.backend.processA90,
-            180: self.backend.processA180,
-            270: self.backend.processA270
+            90: self.backend.processCPA90,
+            180: self.backend.processCPA180,
+            270: self.backend.processCPA270
         }
         self.process = angle_to_function.get(angle)
         if not self.process:
