@@ -160,63 +160,36 @@ class BetterCam:
             self.__frame_available.clear()
         return np.array(ret)
 
-    def __capture(
-        self, region: Tuple[int, int, int, int], target_fps: int = 60, video_mode=False
-    ):
-        if target_fps != 0:
-            period_ms = 1000 // target_fps  # millisenonds for periodic timer
+    def __capture(self, region: Tuple[int, int, int, int], target_fps: int = 60, video_mode=False):
+        if target_fps > 0:
+            period_ms = 1000 // target_fps  # milliseconds for periodic timer
             self.__timer_handle = create_high_resolution_timer()
             set_periodic_timer(self.__timer_handle, period_ms)
 
         self.__capture_start_time = time.perf_counter()
+        try:
+            while not self.__stop_capture.is_set():
+                if target_fps > 0:
+                    wait_for_timer(self.__timer_handle)
 
-        capture_error = None
-
-        while not self.__stop_capture.is_set():
-            if self.__timer_handle:
-                res = wait_for_timer(self.__timer_handle, INFINITE)
-                if res == WAIT_FAILED:
-                    self.__stop_capture.set()
-                    capture_error = ctypes.WinError()
-                    continue
-            try:
                 frame = self._grab(region)
+                if frame is None and video_mode:
+                    frame = np.array(self.__frame_buffer[(self.__head - 1) % self.max_buffer_len], copy=False)
+
                 if frame is not None:
                     with self.__lock:
                         self.__frame_buffer[self.__head] = frame
-                        if self.__full:
-                            self.__tail = (self.__tail + 1) % self.max_buffer_len
                         self.__head = (self.__head + 1) % self.max_buffer_len
+                        if self.__head == self.__tail:
+                            self.__tail = (self.__tail + 1) % self.max_buffer_len
                         self.__frame_available.set()
                         self.__frame_count += 1
-                        self.__full = self.__head == self.__tail
-                elif video_mode:
-                    with self.__lock:
-                        self.__frame_buffer[self.__head] = np.array(
-                            self.__frame_buffer[(self.__head - 1) % self.max_buffer_len]
-                        )
-                        if self.__full:
-                            self.__tail = (self.__tail + 1) % self.max_buffer_len
-                        self.__head = (self.__head + 1) % self.max_buffer_len
-                        self.__frame_available.set()
-                        self.__frame_count += 1
-                        self.__full = self.__head == self.__tail
-            except Exception as e:
-                import traceback
+        finally:
+            if target_fps > 0:
+                cancel_timer(self.__timer_handle)
+            #print(f"Screen Capture FPS: {int(self.__frame_count / (time.perf_counter() - self.__capture_start_time))}")
 
-                print(traceback.format_exc())
-                self.__stop_capture.set()
-                capture_error = e
-                continue
-        if self.__timer_handle:
-            cancel_timer(self.__timer_handle)
-            self.__timer_handle = None
-        if capture_error is not None:
-            self.stop()
-            raise capture_error
-        print(
-            f"Screen Capture FPS: {int(self.__frame_count/(time.perf_counter() - self.__capture_start_time))}"
-        )
+
 
     def _rebuild_frame_buffer(self, region: Tuple[int, int, int, int]):
         if region is None:
