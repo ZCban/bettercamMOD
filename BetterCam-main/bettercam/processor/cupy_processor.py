@@ -5,30 +5,19 @@ from .base import Processor
 
 class CupyProcessor(Processor):
     def __init__(self, color_mode):
-        self.cvtcolor = None
+        if color_mode not in ['BGRA', 'BGR','RGB', 'GRAY']:
+            raise ValueError("Unsupported color mode. Supported modes are 'BGRA', 'BGR', 'RGBA', 'RGB', and 'GRAY'.")
         self.color_mode = color_mode
-        if self.color_mode=='BGRA':
-            self.color_mode = None
 
     def process_cvtcolor(self, image):
-        import cv2
-
-        # only one time process
-        if self.cvtcolor is None:
-            color_mapping = {
-                "RGB": cv2.COLOR_BGRA2RGB,
-                "RGBA": cv2.COLOR_BGRA2RGBA,
-                "BGR": cv2.COLOR_BGRA2BGR,
-                "GRAY": cv2.COLOR_BGRA2GRAY
-            }
-            cv2_code = color_mapping[self.color_mode]
-            if cv2_code != cv2.COLOR_BGRA2GRAY:
-                self.cvtcolor = lambda image: cv2.cvtColor(image, cv2_code)
-            else:
-                self.cvtcolor = lambda image: cv2.cvtColor(image, cv2_code)[
-                    ..., cp.newaxis
-                ] 
-        return self.cvtcolor(image)
+        if self.color_mode == 'RGB':
+            return image[:, :, [2, 1, 0]]  # BGRA to RGB
+        elif self.color_mode == 'BGR':
+            return image[:, :, :3]  # BGRA to BGR
+        elif self.color_mode == 'GRAY':
+            # BGRA to Grayscale using the luminosity method
+            return 0.2989 * image[:, :, 2] + 0.5870 * image[:, :, 1] + 0.1140 * image[:, :, 0]
+        return image
 
     def processCPA0(self, rect, width, height, region):
         pitch = int(rect.Pitch)
@@ -65,7 +54,7 @@ class CupyProcessor(Processor):
             image = image[:, :height, :]
         if self.color_mode is not None:
             image = self.process_cvtcolor(image)
-        return image
+        return cp.asnumpy(image)
     
     def processCPA180(self, rect, width, height, region):
         pitch = int(rect.Pitch)
@@ -83,7 +72,7 @@ class CupyProcessor(Processor):
             image = image[:, region[0]:region[2], :]
         if self.color_mode is not None:
             image = self.process_cvtcolor(image)
-        return image
+        return cp.asnumpy(image)
     
     def processCPA270(self, rect, width, height, region):
         pitch = int(rect.Pitch)
@@ -100,6 +89,10 @@ class CupyProcessor(Processor):
             image = image[:, :height, :]
         if self.color_mode is not None:
             image = self.process_cvtcolor(image)
-        return image
+        return cp.asnumpy(image)
+
+
+
+
 
 
