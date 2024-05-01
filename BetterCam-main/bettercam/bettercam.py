@@ -35,15 +35,15 @@ class BetterCam:
             output=self._output, device=self._device
         )
         self.nvidia_gpu = nvidia_gpu
+
         # Set the rotation angle from the output device
         self.rotation_angle: int = self._output.rotation_angle
-        # Initialize Processor with the rotation angle
+        # Initialize Processor with the rotation angle and backend
         self._processor: Processor = Processor(
             output_color=output_color, 
             nvidia_gpu=nvidia_gpu, 
             rotation_angle=self.rotation_angle
         )
-
         self.width, self.height = self._output.resolution
         self.channel_size = len(output_color) if output_color != "GRAY" else 1
 
@@ -77,7 +77,11 @@ class BetterCam:
         else:
             self._validate_region(region)
         frame = self._grab(region)
-        return frame
+        if frame is not None:
+            return frame
+        else:
+            self._on_output_change()
+            return None
 
     def _grab(self, region: Tuple[int, int, int, int]):
         if self._duplicator.update_frame():
@@ -96,7 +100,7 @@ class BetterCam:
             return None
 
     def _on_output_change(self):
-        time.sleep(0.1)  # Wait for Display mode change (Access Lost)
+        time.sleep(0.05)  # Wait for Display mode change (Access Lost)
         self._duplicator.release()
         self._stagesurf.release()
         self._output.update_desc()
@@ -160,22 +164,30 @@ class BetterCam:
             self.__frame_available.clear()
         return np.array(ret)
 
-    def __capture(self, region: Tuple[int, int, int, int], target_fps: int = 60, video_mode=False):
-        if target_fps > 0:
-            period_ms = 1000 // target_fps  # milliseconds for periodic timer
+    def __capture(
+        self, region: Tuple[int, int, int, int], target_fps: int = 60, video_mode=False
+    ):
+        if target_fps != 0:
+            period_ms = 1000 // target_fps  # millisenonds for periodic timer
             self.__timer_handle = create_high_resolution_timer()
             set_periodic_timer(self.__timer_handle, period_ms)
 
         self.__capture_start_time = time.perf_counter()
-        try:
-            while not self.__stop_capture.is_set():
-                if target_fps > 0:
-                    wait_for_timer(self.__timer_handle)
 
+        capture_error = None
+
+        while not self.__stop_capture.is_set():
+            if self.__timer_handle:
+                res = wait_for_timer(self.__timer_handle, INFINITE)
+                if res == WAIT_FAILED:
+                    self.__stop_capture.set()
+                    capture_error = ctypes.WinError()
+                    continue
+            try:
                 frame = self._grab(region)
                 if frame is None and video_mode:
+                    # Ripeti l'ultimo frame se in modalità video e nessun nuovo frame è disponibile
                     frame = np.array(self.__frame_buffer[(self.__head - 1) % self.max_buffer_len], copy=False)
-
                 if frame is not None:
                     with self.__lock:
                         self.__frame_buffer[self.__head] = frame
@@ -184,11 +196,22 @@ class BetterCam:
                             self.__tail = (self.__tail + 1) % self.max_buffer_len
                         self.__frame_available.set()
                         self.__frame_count += 1
-        finally:
-            if target_fps > 0:
-                cancel_timer(self.__timer_handle)
-            #print(f"Screen Capture FPS: {int(self.__frame_count / (time.perf_counter() - self.__capture_start_time))}")
+            except Exception as e:
+                import traceback
 
+                print(traceback.format_exc())
+                self.__stop_capture.set()
+                capture_error = e
+                continue
+        if self.__timer_handle:
+            cancel_timer(self.__timer_handle)
+            self.__timer_handle = None
+        if capture_error is not None:
+            self.stop()
+            raise capture_error
+        print(
+            f"Screen Capture FPS: {int(self.__frame_count/(time.perf_counter() - self.__capture_start_time))}"
+        )
 
 
     def _rebuild_frame_buffer(self, region: Tuple[int, int, int, int]):
@@ -230,3 +253,4 @@ class BetterCam:
             self._stagesurf,
             self._duplicator,
         )
+
