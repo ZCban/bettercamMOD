@@ -30,47 +30,77 @@ class CupyProcessor(Processor):
                 ] 
         return self.cvtcolor(image)
 
-    def process(self, rect, width, height, region, rotation_angle):
+    def processA0(self, rect, width, height, region):
         pitch = int(rect.Pitch)
-
-        if rotation_angle in (0, 180):
-            offset = (region[1] if rotation_angle==0 else height-region[3])*pitch
-            height = region[3] - region[1]
-        else:
-            offset = (region[0] if rotation_angle==270 else width-region[2])*pitch
-            width = region[2] - region[0]
-
-        if rotation_angle in (0, 180):
-            size = pitch * height
-        else:
-            size = pitch * width
-
-        buffer = (ctypes.c_char*size).from_address(ctypes.addressof(rect.pBits.contents)+offset)#Pointer arithmetic
-        pitch = pitch // 4
-        if rotation_angle in (0, 180):
-            image = cp.frombuffer(buffer, dtype=cp.uint8).reshape(height, pitch, 4)
-
-        elif rotation_angle in (90, 270):
-            image = cp.frombuffer(buffer, dtype=cp.uint8).reshape(width, pitch, 4)
-
-        if not self.color_mode is None:
-            image = self.process_cvtcolor(image)
-
-        if rotation_angle == 90:
-            image = cp.rot90(image, axes=(1, 0))
-        elif rotation_angle == 180:
-            image = cp.rot90(image, k=2, axes=(0, 1))
-        elif rotation_angle == 270:
-            image = cp.rot90(image, axes=(0, 1))
-
-        if rotation_angle in (0, 180) and pitch != width:
-            image = image[:, :width, :]
-        elif rotation_angle in (90, 270) and pitch != height:
-            image = image[:height, :, :]
-
+        offset = region[1] * pitch
+        height = region[3] - region[1]
+        size = pitch * height
+        buffer_ptr = ctypes.addressof(rect.pBits.contents) + offset
+        buffer = cp.frombuffer((ctypes.c_char * size).from_address(buffer_ptr),dtype=cp.uint8)
+        #pitch = pitch // 4
+        image = cp.asarray(buffer, dtype=cp.uint8).reshape((height, pitch // 4, 4))
+        #image = image[:, :width, :]
         if region[3] - region[1] != image.shape[0]:
-            image = image[region[1] : region[3], :, :]
+            image = image[region[1]:region[3], :, :]
         if region[2] - region[0] != image.shape[1]:
-            image = image[:, region[0] : region[2], :]
-
+            image = image[:, region[0]:region[2], :]
+            
+        if self.color_mode is not None:
+            image = self.process_cvtcolor(image)
+        return cp.asnumpy(image)
+    
+    def processA90(self, rect, width, height, region):
+        pitch = int(rect.Pitch)
+        offset = (width - region[2]) * pitch
+        width = region[2] - region[0]
+        size = pitch * width
+        buffer_ptr = ctypes.addressof(rect.pBits.contents) + offset
+        buffer = cp.frombuffer((ctypes.c_char * size).from_address(buffer_ptr),dtype=cp.uint8)
+        #pitch = pitch // 4
+        image = cp.asarray(buffer, dtype=cp.uint8).reshape((height, pitch // 4, 4))
+        image = cp.rot90(image, axes=(1, 0))
+        if width != image.shape[0]:
+            image = image[:width, :, :]
+        if height != image.shape[1]:
+            image = image[:, :height, :]
+        if self.color_mode is not None:
+            image = self.process_cvtcolor(image)
         return image
+    
+    def processA180(self, rect, width, height, region):
+        pitch = int(rect.Pitch)
+        offset = (height - region[3]) * pitch
+        height = region[3] - region[1]
+        size = pitch * height
+        buffer_ptr = ctypes.addressof(rect.pBits.contents) + offset
+        buffer = cp.frombuffer((ctypes.c_char * size).from_address(buffer_ptr),dtype=cp.uint8)
+        #pitch = pitch // 4
+        image = cp.asarray(buffer, dtype=cp.uint8).reshape((height, pitch // 4, 4))
+        image = cp.rot90(image, k=2, axes=(0, 1))
+        if region[3] - region[1] != image.shape[0]:
+            image = image[region[1]:region[3], :, :]
+        if region[2] - region[0] != image.shape[1]:
+            image = image[:, region[0]:region[2], :]
+        if self.color_mode is not None:
+            image = self.process_cvtcolor(image)
+        return image
+    
+    def processA270(self, rect, width, height, region):
+        pitch = int(rect.Pitch)
+        offset = region[0] * pitch
+        width = region[2] - region[0]
+        size = pitch * width
+        buffer_ptr = ctypes.addressof(rect.pBits.contents) + offset
+        buffer = cp.frombuffer((ctypes.c_char * size).from_address(buffer_ptr),dtype=cp.uint8)
+        image = cp.asarray(buffer, dtype=cp.uint8).reshape((height, pitch // 4, 4))
+        image = cp.rot90(image, axes=(0, 1))
+        if width != image.shape[0]:
+            image = image[:width, :, :]
+        if height != image.shape[1]:
+            image = image[:, :height, :]
+        if self.color_mode is not None:
+            image = self.process_cvtcolor(image)
+        return image
+
+
+
