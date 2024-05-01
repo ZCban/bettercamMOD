@@ -30,7 +30,7 @@ class CupyProcessor(Processor):
                 ] 
         return self.cvtcolor(image)
 
-    def processA0(self, rect, width, height, region):
+    def processCPA0(self, rect, width, height, region):
         pitch = int(rect.Pitch)
         offset = region[1] * pitch
         height = region[3] - region[1]
@@ -49,7 +49,7 @@ class CupyProcessor(Processor):
             image = self.process_cvtcolor(image)
         return cp.asnumpy(image)
     
-    def processA90(self, rect, width, height, region):
+    def processCPA90(self, rect, width, height, region):
         pitch = int(rect.Pitch)
         offset = (width - region[2]) * pitch
         width = region[2] - region[0]
@@ -67,7 +67,7 @@ class CupyProcessor(Processor):
             image = self.process_cvtcolor(image)
         return image
     
-    def processA180(self, rect, width, height, region):
+    def processCPA180(self, rect, width, height, region):
         pitch = int(rect.Pitch)
         offset = (height - region[3]) * pitch
         height = region[3] - region[1]
@@ -85,7 +85,7 @@ class CupyProcessor(Processor):
             image = self.process_cvtcolor(image)
         return image
     
-    def processA270(self, rect, width, height, region):
+    def processCPA270(self, rect, width, height, region):
         pitch = int(rect.Pitch)
         offset = region[0] * pitch
         width = region[2] - region[0]
@@ -101,6 +101,5 @@ class CupyProcessor(Processor):
         if self.color_mode is not None:
             image = self.process_cvtcolor(image)
         return image
-
 
 
